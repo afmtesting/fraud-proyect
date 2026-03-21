@@ -1,0 +1,60 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: creditcard_batches
+      - name: transaction_events
+
+models:
+  - name: stg_creditcard
+    columns:
+      - name: dt
+        tests: [not_null]
+      - name: time_sec
+        tests: [not_null]
+      - name: amount
+        tests: [not_null]
+      - name: is_fraud
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+
+  - name: stg_transaction_events
+    columns:
+      - name: dt
+        tests: [not_null]
+      - name: time_sec
+        tests: [not_null]
+      - name: channel
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["web", "mobile", "pos", "unknown"]
+      - name: device
+        tests: [not_null]
+      - name: merchant
+        tests: [not_null]
+      - name: risk_score
+        tests: [not_null]
+
+  - name: stg_transactions
+    columns:
+      - name: dt
+        tests: [not_null]
+      - name: time_sec
+        tests: [not_null]
+      - name: channel
+        tests: [not_null]
+      - name: device
+        tests: [not_null]
+      - name: merchant
+        tests: [not_null]
+      - name: tx_count
+        tests: [not_null]
+      - name: fraud_tx_count
+        tests: [not_null]

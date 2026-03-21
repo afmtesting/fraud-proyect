@@ -1,0 +1,26 @@
+name: fraud_proyect
+
+prefect-version: "3"
+
+deployments:
+  - name: fraud-daily
+    entrypoint: prefect_flow.py:fraud_daily_flow
+    description: "Daily run: landing/bronze -> raw -> dbt -> marts"
+
+    schedules:
+      - cron: "0 10 * * *"
+        timezone: "America/Mexico_City"
+        active: true
+
+    work_pool:
+      name: fraud-pool
+
+    job_variables:
+      working_dir: "C:\\Arturo\\Consubanco\\fraud_proyect"
+
+      env:
+        PROJECT_ROOT: "C:\\Arturo\\Consubanco\\fraud_proyect"
+        SIMULATE: "1"
+        BAD_RATE_CSV: "0.02"
+        BAD_RATE_EVENTS: "0.02"
+        FRAUD_RATE: "0.007"

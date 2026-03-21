@@ -1,0 +1,28 @@
+# Patch guide (manual): fault injection for quarantine simulation
+# Apply these edits in your local repo.
+
+1) simulate_arrival.py
+- Add env vars:
+  BAD_RATE_CSV = float(os.getenv("BAD_RATE_CSV","0.01"))
+  BAD_RATE_EVENTS = float(os.getenv("BAD_RATE_EVENTS","0.01"))
+
+- When generating creditcard rows:
+  if random.random() < BAD_RATE_CSV:
+      # Example invalid row
+      amount = -abs(amount)
+      class_ = 3  # invalid label
+
+- When generating event lines:
+  if random.random() < BAD_RATE_EVENTS:
+      # Example invalid JSON line
+      f.write("NOT_JSON\n")
+      continue
+  # Or risk_score out of range:
+  risk_score = 1.7
+
+2) process_creditcard_medallion.py / process_events_medallion.py
+- Ensure per-row try/except:
+  - Valid rows appended/inserted
+  - Invalid rows appended to quarantine with reason
+- Update batch_control:
+  status='LOADED' even if rows_quarantined > 0 (as long as rows_valid > 0)

@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+logs/
+target/
+dbt_packages/
+artifacts/
+data/
+*.csv
+*.log

@@ -1,0 +1,13 @@
+conexiones
+
+docker ps
+docker exec -it fraud_pg psql -U fraud -d frauddb
+docker compose up -d
+docker compose config --services
+
+cerrar todo y levantar limpio
+docker compose down
+docker compose up -d
+
+
+docker exec -it fraud_pg psql -U fraud -d frauddb

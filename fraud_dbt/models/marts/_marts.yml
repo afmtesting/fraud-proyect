@@ -1,0 +1,113 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: "Dimensión de fechas derivada de dt."
+    columns:
+      - name: date_id
+        description: "Clave sustituta YYYYMMDD."
+        tests: [not_null, unique]
+      - name: dt
+        description: "Fecha calendario."
+        tests: [not_null, unique]
+
+  - name: dim_time
+    description: "Dimensión de tiempo a nivel segundo (0..86399)."
+    columns:
+      - name: time_id
+        description: "Segundo del día."
+        tests: [not_null, unique]
+      - name: time_value
+        description: "Hora (hh:mm:ss)."
+      - name: hour
+        tests: [not_null]
+      - name: minute
+        tests: [not_null]
+      - name: second
+        tests: [not_null]
+
+  - name: dim_channel
+    description: "Dimensión de canal (web/mobile/pos/unknown)."
+    columns:
+      - name: channel_id
+        description: "Hash MD5 del canal normalizado."
+        tests: [not_null, unique]
+      - name: channel
+        description: "Nombre de canal normalizado."
+        tests: [not_null, unique]
+
+  - name: dim_device
+    description: "Dimensión de dispositivo."
+    columns:
+      - name: device_id
+        description: "Hash MD5 del dispositivo normalizado."
+        tests: [not_null, unique]
+      - name: device
+        description: "Nombre de dispositivo normalizado."
+        tests: [not_null, unique]
+
+  - name: dim_merchant
+    description: "Dimensión de comercio."
+    columns:
+      - name: merchant_id
+        description: "Hash MD5 del comercio normalizado."
+        tests: [not_null, unique]
+      - name: merchant
+        description: "Nombre de comercio normalizado."
+        tests: [not_null, unique]
+
+  - name: fact_transactions
+    description: "Hechos a grano (dt,time_sec) con FK a dim_date/dim_time/dims; transaction_ts construido."
+    columns:
+      - name: transaction_id
+        description: "PK del hecho (hash de dt|time_sec)."
+        tests: [not_null, unique]
+
+      - name: date_id
+        description: "FK a dim_date."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_id
+
+      - name: time_id
+        description: "FK a dim_time."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_time')
+                field: time_id
+
+      - name: channel_id
+        description: "FK a dim_channel."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_channel')
+                field: channel_id
+
+      - name: device_id
+        description: "FK a dim_device."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_device')
+                field: device_id
+
+      - name: merchant_id
+        description: "FK a dim_merchant."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_merchant')
+                field: merchant_id
+
+      - name: transaction_ts
+        description: "Timestamp derivado (dt + time_sec)."
+        tests: [not_null]
