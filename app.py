@@ -8,14 +8,11 @@ import matplotlib.pyplot as plt
 load_dotenv()
 
 st.set_page_config(
-    page_title="Fraud Analytics Dashboard",
+    page_title="Dashboard de Analítica de Fraude",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# =========================
-# CSS
-# =========================
 st.markdown(
     """
     <style>
@@ -107,52 +104,40 @@ st.markdown(
 pg_url = os.getenv("PG_URL")
 engine = create_engine(pg_url)
 
-# =========================
-# Load data
-# =========================
 kpi = pd.read_sql("select * from public.mart_fraud_kpi limit 1", engine)
 channel = pd.read_sql("select * from public.mart_fraud_by_channel", engine)
 metrics = pd.read_sql("select * from public.ml_model_metrics", engine)
 
-# =========================
-# Helper
-# =========================
-def metric_card(title: str, value: str):
+def tarjeta_metrica(titulo: str, valor: str):
     st.markdown(
         f"""
         <div class="dashboard-card">
             <div class="metric-accent"></div>
-            <div class="metric-label">{title}</div>
-            <div class="metric-value">{value}</div>
+            <div class="metric-label">{titulo}</div>
+            <div class="metric-value">{valor}</div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-# =========================
-# Header
-# =========================
 st.markdown(
     """
     <div class="dashboard-card">
         <div class="section-title" style="font-size: 2rem; margin-bottom: 0.3rem;">
-            Fraud Analytics Dashboard
+            Dashboard de Analítica de Fraude
         </div>
         <div class="section-subtitle">
-            Prototype for fraud monitoring, dimensional analytics, and machine learning evaluation
+            Prototipo para monitoreo de fraude, analítica dimensional y evaluación de modelo de machine learning
         </div>
     </div>
     """,
     unsafe_allow_html=True
 )
 
-# =========================
-# KPI cards
-# =========================
 st.markdown(
     """
-    <div class="section-title">Executive Overview</div>
-    <div class="section-subtitle">Main indicators generated from the analytical mart</div>
+    <div class="section-title">Resumen Ejecutivo</div>
+    <div class="section-subtitle">Indicadores principales generados desde el mart analítico</div>
     """,
     unsafe_allow_html=True
 )
@@ -165,25 +150,22 @@ if not kpi.empty:
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        metric_card("Transactions", f"{tx_count:,}")
+        tarjeta_metrica("Transacciones", f"{tx_count:,}")
     with c2:
-        metric_card("Fraud Transactions", f"{fraud_tx_count:,}")
+        tarjeta_metrica("Transacciones con fraude", f"{fraud_tx_count:,}")
     with c3:
-        metric_card("Fraud Rate", f"{fraud_rate:.4f}")
+        tarjeta_metrica("Tasa de fraude", f"{fraud_rate:.4f}")
     with c4:
-        metric_card("Total Amount", f"{amount_total:,.2f}")
+        tarjeta_metrica("Monto total", f"{amount_total:,.2f}")
 else:
-    st.warning("No KPI data available")
+    st.warning("No hay datos disponibles en public.mart_fraud_kpi")
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
-# =========================
-# Charts
-# =========================
 st.markdown(
     """
-    <div class="section-title">Fraud Monitoring by Channel</div>
-    <div class="section-subtitle">Comparative view of fraud volume and fraud rate</div>
+    <div class="section-title">Monitoreo de Fraude por Canal</div>
+    <div class="section-subtitle">Vista comparativa del volumen de fraude y la tasa de fraude</div>
     """,
     unsafe_allow_html=True
 )
@@ -192,47 +174,44 @@ left, right = st.columns(2)
 
 with left:
     st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
-    st.markdown("**Fraud Transactions by Channel**")
+    st.markdown("**Transacciones fraudulentas por canal**")
 
     if not channel.empty and "channel" in channel.columns and "fraud_tx_count" in channel.columns:
         fig, ax = plt.subplots(figsize=(6, 3.8))
         ax.bar(channel["channel"], channel["fraud_tx_count"])
-        ax.set_title("Fraud Volume", pad=12)
-        ax.set_xlabel("Channel")
-        ax.set_ylabel("Fraud Transactions")
+        ax.set_title("Volumen de fraude", pad=12)
+        ax.set_xlabel("Canal")
+        ax.set_ylabel("Transacciones con fraude")
         ax.grid(axis="y", alpha=0.25)
         st.pyplot(fig, use_container_width=True)
         plt.close(fig)
     else:
-        st.info("No channel fraud volume data available")
+        st.info("No hay datos de fraude por canal disponibles")
     st.markdown('</div>', unsafe_allow_html=True)
 
 with right:
     st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
-    st.markdown("**Fraud Rate by Channel**")
+    st.markdown("**Tasa de fraude por canal**")
 
     if not channel.empty and "channel" in channel.columns and "fraud_rate" in channel.columns:
         fig2, ax2 = plt.subplots(figsize=(6, 3.8))
         ax2.bar(channel["channel"], channel["fraud_rate"])
-        ax2.set_title("Fraud Rate", pad=12)
-        ax2.set_xlabel("Channel")
-        ax2.set_ylabel("Rate")
+        ax2.set_title("Tasa de fraude", pad=12)
+        ax2.set_xlabel("Canal")
+        ax2.set_ylabel("Tasa")
         ax2.grid(axis="y", alpha=0.25)
         st.pyplot(fig2, use_container_width=True)
         plt.close(fig2)
     else:
-        st.info("No channel fraud rate data available")
+        st.info("No hay datos de tasa de fraude por canal disponibles")
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
-# =========================
-# ML section
-# =========================
 st.markdown(
     """
-    <div class="section-title">Machine Learning Model</div>
-    <div class="section-subtitle">Persisted metrics from the training process executed by ml/train_model.py</div>
+    <div class="section-title">Modelo de Machine Learning</div>
+    <div class="section-subtitle">Métricas persistidas del proceso de entrenamiento ejecutado por ml/train_model.py</div>
     """,
     unsafe_allow_html=True
 )
@@ -256,14 +235,14 @@ with ml_left:
 
         st.markdown(
             """
-            **Model evidence**
-            - Training script: `ml/train_model.py`
-            - Persisted metrics: `public.ml_model_metrics`
-            - Local artifact: `artifacts/model.joblib`
+            **Evidencia del modelo**
+            - Script de entrenamiento: `ml/train_model.py`
+            - Métricas persistidas: `public.ml_model_metrics`
+            - Artefacto local generado: `artifacts/model.joblib`
             """
         )
     else:
-        st.warning("No ML metrics available")
+        st.warning("No hay métricas del modelo disponibles")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -276,40 +255,37 @@ with ml_right:
         if numeric_cols:
             fig3, ax3 = plt.subplots(figsize=(7, 3.8))
             ax3.bar(numeric_cols, [float(metrics[c].iloc[0]) for c in numeric_cols])
-            ax3.set_title("ML Performance Overview", pad=12)
-            ax3.set_ylabel("Metric Value")
+            ax3.set_title("Resumen de desempeño del modelo", pad=12)
+            ax3.set_ylabel("Valor de la métrica")
             ax3.grid(axis="y", alpha=0.25)
             plt.xticks(rotation=25)
             st.pyplot(fig3, use_container_width=True)
             plt.close(fig3)
         else:
-            st.info("No numeric ML metrics available")
+            st.info("No hay métricas numéricas disponibles")
     else:
-        st.info("No ML metrics available")
+        st.info("No hay métricas del modelo disponibles")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
-# =========================
-# Details
-# =========================
 st.markdown(
     """
-    <div class="section-title">Detail Tables</div>
-    <div class="section-subtitle">Supporting data used by the dashboard</div>
+    <div class="section-title">Tablas de detalle</div>
+    <div class="section-subtitle">Información de soporte utilizada por el dashboard</div>
     """,
     unsafe_allow_html=True
 )
 
-with st.expander("View KPI table"):
+with st.expander("Ver tabla KPI"):
     if not kpi.empty:
         st.dataframe(kpi, use_container_width=True)
 
-with st.expander("View channel table"):
+with st.expander("Ver tabla por canal"):
     if not channel.empty:
         st.dataframe(channel, use_container_width=True)
 
-with st.expander("View ML metrics table"):
+with st.expander("Ver tabla de métricas del modelo"):
     if not metrics.empty:
         st.dataframe(metrics, use_container_width=True)
