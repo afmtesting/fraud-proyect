@@ -5,6 +5,16 @@ from sqlalchemy import create_engine
 from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 
+from sklearn.metrics import (
+    confusion_matrix,
+    precision_score,
+    recall_score,
+    f1_score,
+    accuracy_score,
+    precision_recall_curve,
+    average_precision_score
+)
+
 load_dotenv()
 
 st.set_page_config(
@@ -13,6 +23,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# =========================
+# CSS
+# =========================
 st.markdown(
     """
     <style>
@@ -84,12 +97,6 @@ st.markdown(
             border-radius: 14px;
         }
 
-        div[data-testid="stMetric"] {
-            background: transparent;
-            border: none;
-            padding: 0;
-        }
-
         hr {
             border: none;
             height: 1px;
@@ -101,13 +108,28 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# =========================
+# Conexión
+# =========================
 pg_url = os.getenv("PG_URL")
 engine = create_engine(pg_url)
 
-kpi = pd.read_sql("select * from public.mart_fraud_kpi limit 1", engine)
-channel = pd.read_sql("select * from public.mart_fraud_by_channel", engine)
-metrics = pd.read_sql("select * from public.ml_model_metrics", engine)
+# =========================
+# Carga de datos
+# =========================
+@st.cache_data(ttl=300)
+def cargar_datos():
+    kpi = pd.read_sql("select * from public.mart_fraud_kpi limit 1", engine)
+    channel = pd.read_sql("select * from public.mart_fraud_by_channel", engine)
+    metrics = pd.read_sql("select * from public.ml_model_metrics", engine)
+    eval_preds = pd.read_sql("select * from public.ml_eval_predictions", engine)
+    return kpi, channel, metrics, eval_preds
 
+kpi, channel, metrics, eval_preds = cargar_datos()
+
+# =========================
+# Helper visual
+# =========================
 def tarjeta_metrica(titulo: str, valor: str):
     st.markdown(
         f"""
@@ -120,6 +142,9 @@ def tarjeta_metrica(titulo: str, valor: str):
         unsafe_allow_html=True
     )
 
+# =========================
+# Header
+# =========================
 st.markdown(
     """
     <div class="dashboard-card">
@@ -127,13 +152,16 @@ st.markdown(
             Dashboard de Analítica de Fraude
         </div>
         <div class="section-subtitle">
-            Prototipo para monitoreo de fraude, analítica dimensional y evaluación de modelo de machine learning
+            Prototipo para monitoreo de fraude, analítica dimensional y evaluación del modelo de machine learning
         </div>
     </div>
     """,
     unsafe_allow_html=True
 )
 
+# =========================
+# Resumen ejecutivo
+# =========================
 st.markdown(
     """
     <div class="section-title">Resumen Ejecutivo</div>
@@ -162,6 +190,9 @@ else:
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
+# =========================
+# Monitoreo por canal
+# =========================
 st.markdown(
     """
     <div class="section-title">Monitoreo de Fraude por Canal</div>
@@ -208,68 +239,172 @@ with right:
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
+# =========================
+# Modelo ML
+# =========================
 st.markdown(
     """
     <div class="section-title">Modelo de Machine Learning</div>
-    <div class="section-subtitle">Métricas persistidas del proceso de entrenamiento ejecutado por ml/train_model.py</div>
+    <div class="section-subtitle">Evaluación del Random Forest sin reentrenar en cada ejecución</div>
     """,
     unsafe_allow_html=True
 )
 
-ml_left, ml_right = st.columns([1.2, 1.8])
+if eval_preds.empty:
+    st.warning("No existe la tabla public.ml_eval_predictions. Ejecuta una vez ml/train_model.py.")
+else:
+    # Threshold dinámico
+    threshold = st.slider(
+        "Umbral de clasificación",
+        min_value=0.05,
+        max_value=0.95,
+        value=0.50,
+        step=0.05
+    )
 
-with ml_left:
-    st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+    y_true = eval_preds["y_true"].astype(int)
+    y_score = eval_preds["y_score"].astype(float)
+    y_pred = (y_score >= threshold).astype(int)
 
-    if not metrics.empty:
-        metric_columns = metrics.columns.tolist()
-        display_cols = metric_columns[:4]
+    accuracy = accuracy_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, zero_division=0)
+    recall = recall_score(y_true, y_pred, zero_division=0)
+    f1 = f1_score(y_true, y_pred, zero_division=0)
+    pr_auc = average_precision_score(y_true, y_score)
 
-        cols = st.columns(len(display_cols))
-        for i, col_name in enumerate(display_cols):
-            try:
-                value = float(metrics[col_name].iloc[0])
-                cols[i].metric(col_name.upper(), f"{value:.4f}")
-            except Exception:
-                cols[i].metric(col_name.upper(), str(metrics[col_name].iloc[0]))
+    # Tarjetas métricas del modelo
+    st.markdown(
+        """
+        <div class="section-subtitle">Métricas del modelo para el threshold seleccionado</div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    m1, m2, m3, m4, m5 = st.columns(5)
+    with m1:
+        tarjeta_metrica("Accuracy", f"{accuracy:.4f}")
+    with m2:
+        tarjeta_metrica("Precision", f"{precision:.4f}")
+    with m3:
+        tarjeta_metrica("Recall", f"{recall:.4f}")
+    with m4:
+        tarjeta_metrica("F1-Score", f"{f1:.4f}")
+    with m5:
+        tarjeta_metrica("PR AUC", f"{pr_auc:.4f}")
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+    # Layout visual del modelo
+    ml_left, ml_right = st.columns(2)
+
+    with ml_left:
+        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+        st.markdown("**Matriz de confusión**")
+
+        cm = confusion_matrix(y_true, y_pred)
+        tn, fp, fn, tp = cm.ravel()
+
+        fig_cm, ax_cm = plt.subplots(figsize=(6, 5))
+        im = ax_cm.imshow(cm)
+
+        ax_cm.set_xticks([0, 1])
+        ax_cm.set_yticks([0, 1])
+        ax_cm.set_xticklabels(["Predicción: No fraude", "Predicción: Fraude"])
+        ax_cm.set_yticklabels(["Real: No fraude", "Real: Fraude"])
+        ax_cm.set_title("Matriz de confusión", pad=12)
+
+        labels = [
+            [f"TN\n{tn}", f"FP\n{fp}"],
+            [f"FN\n{fn}", f"TP\n{tp}"]
+        ]
+
+        for i in range(2):
+            for j in range(2):
+                ax_cm.text(j, i, labels[i][j], ha="center", va="center", fontsize=12)
+
+        fig_cm.colorbar(im, ax=ax_cm, fraction=0.046, pad=0.04)
+        st.pyplot(fig_cm, use_container_width=True)
+        plt.close(fig_cm)
+
+        st.markdown(
+            f"""
+            **Lectura rápida**
+            - TN: {tn}
+            - FP: {fp}
+            - FN: {fn}
+            - TP: {tp}
+            """
+        )
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with ml_right:
+        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+        st.markdown("**Curva Precision-Recall**")
+
+        precision_curve, recall_curve, _ = precision_recall_curve(y_true, y_score)
+
+        fig_pr, ax_pr = plt.subplots(figsize=(6, 5))
+        ax_pr.plot(recall_curve, precision_curve)
+        ax_pr.fill_between(recall_curve, precision_curve, alpha=0.2)
+        ax_pr.set_title(f"Curva Precision-Recall (AUC = {pr_auc:.4f})", pad=12)
+        ax_pr.set_xlabel("Recall")
+        ax_pr.set_ylabel("Precision")
+        ax_pr.grid(alpha=0.25)
+
+        st.pyplot(fig_pr, use_container_width=True)
+        plt.close(fig_pr)
 
         st.markdown(
             """
-            **Evidencia del modelo**
-            - Script de entrenamiento: `ml/train_model.py`
-            - Métricas persistidas: `public.ml_model_metrics`
-            - Artefacto local generado: `artifacts/model.joblib`
+            **Interpretación**
+            - La curva muestra el equilibrio entre precisión y sensibilidad.
+            - En problemas desbalanceados, esta métrica es más informativa que accuracy.
             """
         )
-    else:
-        st.warning("No hay métricas del modelo disponibles")
 
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-with ml_right:
-    st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+    st.markdown("<hr>", unsafe_allow_html=True)
 
-    if not metrics.empty:
-        numeric_cols = metrics.select_dtypes(include=["number"]).columns.tolist()
+    # Evidencia académica
+    st.markdown(
+        """
+        <div class="section-title">Evidencia del modelo</div>
+        <div class="section-subtitle">Elementos que conectan el dashboard con la fase de modelado del documento</div>
+        """,
+        unsafe_allow_html=True
+    )
 
-        if numeric_cols:
-            fig3, ax3 = plt.subplots(figsize=(7, 3.8))
-            ax3.bar(numeric_cols, [float(metrics[c].iloc[0]) for c in numeric_cols])
-            ax3.set_title("Resumen de desempeño del modelo", pad=12)
-            ax3.set_ylabel("Valor de la métrica")
-            ax3.grid(axis="y", alpha=0.25)
-            plt.xticks(rotation=25)
-            st.pyplot(fig3, use_container_width=True)
-            plt.close(fig3)
+    ev1, ev2 = st.columns([1.2, 1.8])
+
+    with ev1:
+        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+        st.markdown(
+            """
+            **Persistencia del modelo**
+            - Script de entrenamiento: `ml/train_model.py`
+            - Métricas en BD: `public.ml_model_metrics`
+            - Predicciones de evaluación: `public.ml_eval_predictions`
+            - Artefacto local: `artifacts/model.joblib`
+            """
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with ev2:
+        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+        if not metrics.empty:
+            st.markdown("**Tabla persistida de métricas**")
+            st.dataframe(metrics, use_container_width=True)
         else:
-            st.info("No hay métricas numéricas disponibles")
-    else:
-        st.info("No hay métricas del modelo disponibles")
-
-    st.markdown('</div>', unsafe_allow_html=True)
+            st.info("No hay datos disponibles en public.ml_model_metrics")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
+# =========================
+# Tablas detalle
+# =========================
 st.markdown(
     """
     <div class="section-title">Tablas de detalle</div>
@@ -289,3 +424,7 @@ with st.expander("Ver tabla por canal"):
 with st.expander("Ver tabla de métricas del modelo"):
     if not metrics.empty:
         st.dataframe(metrics, use_container_width=True)
+
+with st.expander("Ver predicciones de evaluación del modelo"):
+    if not eval_preds.empty:
+        st.dataframe(eval_preds.head(200), use_container_width=True)
